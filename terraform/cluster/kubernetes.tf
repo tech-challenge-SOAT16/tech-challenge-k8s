@@ -31,6 +31,13 @@ module "platform" {
   gitops_revision           = var.gitops_revision
   gitops_values = {
     profile = "eks"
+    apps = {
+      repoURL = var.app_repo_url
+      environments = {
+        techchallenge-homolog    = { targetRevision = var.app_revision }
+        techchallenge-production = { targetRevision = var.app_revision }
+      }
+    }
   }
 
   depends_on = [aws_eks_addon.after_nodes]

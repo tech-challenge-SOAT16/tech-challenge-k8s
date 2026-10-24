@@ -105,3 +105,15 @@ variable "gitops_revision" {
   type        = string
   default     = "main"
 }
+
+variable "app_repo_url" {
+  description = "Repositório da aplicação com os overlays Kustomize da API."
+  type        = string
+  default     = "https://github.com/tech-challenge-SOAT16/tech-challenge-application"
+}
+
+variable "app_revision" {
+  description = "Branch do repositório da aplicação com os overlays dos dois ambientes."
+  type        = string
+  default     = "main"
+}
