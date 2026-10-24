@@ -1,0 +1,53 @@
+{{- range $name, $c := .Values.platform }}
+{{- if or (not $c.withApps) $.Values.apps.enabled }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: {{ $c.wave | quote }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: {{ $c.namespace }}
+  {{- if $c.chart }}
+  sources:
+    - repoURL: {{ $c.chart.repoURL }}
+      chart: {{ $c.chart.name }}
+      targetRevision: {{ $c.chart.version }}
+      helm:
+        releaseName: {{ $name }}
+        ignoreMissingValueFiles: true
+        valueFiles:
+          - $values/gitops/platform/{{ $name }}/values.yaml
+          - $values/gitops/platform/{{ $name }}/values-{{ $.Values.profile }}.yaml
+    - repoURL: {{ $.Values.repoURL }}
+      targetRevision: {{ $.Values.targetRevision }}
+      ref: values
+  {{- else }}
+  source:
+    repoURL: {{ $.Values.repoURL }}
+    targetRevision: {{ $.Values.targetRevision }}
+    path: {{ $c.path }}
+  {{- end }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+    {{- if $c.serverSideApply }}
+    syncOptions:
+      - ServerSideApply=true
+    {{- end }}
+{{- end }}
+{{- end }}

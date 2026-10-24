@@ -1,0 +1,92 @@
+# Repositório e branch deste repositório. A Application raiz (Terraform)
+# sobrescreve repoURL/targetRevision e escolhe o profile (eks ou kind).
+repoURL: https://github.com/tech-challenge-SOAT16/tech-challenge-k8s
+targetRevision: main
+profile: eks
+
+# Componentes da plataforma. Ordem garantida por sync wave:
+# 0 CRDs e métricas, 1 observabilidade, 2 gateway, 3 rotas e SMTP, 4 API.
+# Componentes com "chart" usam gitops/platform/<nome>/values.yaml e
+# values-<profile>.yaml (opcional); componentes com "path" aplicam o diretório.
+# "withApps: true" só é criado quando apps.enabled é true.
+platform:
+  kube-prometheus-stack:
+    wave: 0
+    namespace: monitoring
+    serverSideApply: true
+    chart:
+      repoURL: https://prometheus-community.github.io/helm-charts
+      name: kube-prometheus-stack
+      version: 92.11.0
+  loki:
+    wave: 1
+    namespace: monitoring
+    chart:
+      repoURL: https://grafana-community.github.io/helm-charts
+      name: loki
+      version: 19.1.1
+  tempo:
+    wave: 1
+    namespace: monitoring
+    chart:
+      repoURL: https://grafana-community.github.io/helm-charts
+      name: tempo
+      version: 3.2.1
+  otel-collector:
+    wave: 1
+    namespace: monitoring
+    chart:
+      repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+      name: opentelemetry-collector
+      version: 0.177.0
+  grafana-dashboards:
+    wave: 1
+    namespace: monitoring
+    serverSideApply: true
+    path: gitops/platform/grafana-dashboards
+  alerts:
+    wave: 1
+    namespace: monitoring
+    path: gitops/platform/alerts
+  kong:
+    wave: 2
+    namespace: kong
+    chart:
+      repoURL: https://charts.konghq.com
+      name: ingress
+      version: 0.24.0
+  gateway:
+    wave: 3
+    namespace: kong
+    path: gitops/platform/gateway
+  mailpit-homolog:
+    wave: 3
+    namespace: techchallenge-homolog
+    path: gitops/platform/mailpit
+  mailpit-production:
+    wave: 3
+    namespace: techchallenge
+    path: gitops/platform/mailpit
+  # Rotas da API: na mesma wave da API, porque o Ingress só fica Healthy
+  # depois que o Service da API existe.
+  api-routes:
+    wave: 4
+    namespace: kong
+    path: gitops/platform/api-routes
+    withApps: true
+
+# API: overlays Kustomize do repositório da aplicação. A pipeline da aplicação
+# grava a tag da imagem no overlay e o Argo CD sincroniza (ADR 0005).
+apps:
+  enabled: true
+  wave: 4
+  repoURL: https://github.com/tech-challenge-SOAT16/tech-challenge-application
+  environments:
+    techchallenge-homolog:
+      namespace: techchallenge-homolog
+      path: k8s/overlays/aws-eks-homolog
+      targetRevision: develop
+    techchallenge-production:
+      namespace: techchallenge
+      path: k8s/overlays/aws-eks
+      targetRevision: main
