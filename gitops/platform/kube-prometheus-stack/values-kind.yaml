@@ -1,0 +1,5 @@
+# Docker Desktop não monta / como shared; o node-exporter não consegue usar
+# mountPropagation no kind.
+prometheus-node-exporter:
+  hostRootFsMount:
+    enabled: false

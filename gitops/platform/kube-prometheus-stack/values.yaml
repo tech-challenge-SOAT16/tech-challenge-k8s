@@ -1,0 +1,159 @@
+# Prometheus Operator, Prometheus, Alertmanager, Grafana, kube-state-metrics e
+# node-exporter. Armazenamento efêmero: no AWS Academy os nós são parados a
+# cada sessão e os dados de observabilidade servem só para a demonstração.
+
+# O EKS não expõe controller-manager, scheduler, etcd nem métricas do kube-proxy.
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+defaultRules:
+  rules:
+    etcd: false
+    kubeControllerManager: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    kubeProxy: false
+    windows: false
+
+windowsMonitoring:
+  enabled: false
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 48Mi
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 24Mi
+
+prometheus:
+  prometheusSpec:
+    retention: 3d
+    # Recebe as métricas da API pelo OpenTelemetry Collector (OTLP) e as
+    # métricas derivadas de spans pelo Tempo (remote write).
+    enableOTLPReceiver: true
+    enableRemoteWriteReceiver: true
+    # Mesmo comportamento do docker compose: increase() conta o primeiro
+    # evento de uma série nova depois de um restart da API.
+    enableFeatures:
+      - created-timestamp-zero-ingestion
+    otlp:
+      promoteResourceAttributes:
+        - deployment.environment.name
+        - k8s.namespace.name
+    # Seleciona ServiceMonitors e PrometheusRules de qualquer release.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 400Mi
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+  # Alertas da API vão por e-mail para o Mailpit de produção; o restante só
+  # aparece no Alertmanager e no Grafana.
+  config:
+    global:
+      smtp_smarthost: mailpit.techchallenge.svc.cluster.local:1025
+      smtp_from: alertmanager@techchallenge.local
+      smtp_require_tls: false
+    route:
+      receiver: "null"
+      group_by: [alertname, k8s_namespace_name]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      routes:
+        - receiver: oficina
+          matchers:
+            - service = "techchallenge-api"
+    receivers:
+      - name: "null"
+      - name: oficina
+        email_configs:
+          - to: oficina@techchallenge.local
+            send_resolved: true
+
+grafana:
+  testFramework:
+    enabled: false
+  admin:
+    # Secret criado pelo Terraform (terraform output -raw grafana_admin_password).
+    existingSecret: grafana-admin
+  resources:
+    requests:
+      cpu: 50m
+      memory: 160Mi
+  grafana.ini:
+    server:
+      root_url: "%(protocol)s://%(domain)s/grafana"
+      serve_from_sub_path: true
+    analytics:
+      check_for_updates: false
+      reporting_enabled: false
+    dashboards:
+      default_home_dashboard_path: /tmp/dashboards/TechChallenge/techchallenge-ordens-servico.json
+  sidecar:
+    dashboards:
+      folderAnnotation: grafana_folder
+      provider:
+        allowUiUpdates: true
+        foldersFromFilesStructure: true
+    datasources:
+      # UIDs iguais aos do docker compose (otel-lgtm): os dashboards e alertas
+      # da aplicação referenciam prometheus, loki e tempo.
+      uid: prometheus
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      uid: loki
+      access: proxy
+      url: http://loki.monitoring.svc.cluster.local:3100
+      jsonData:
+        derivedFields:
+          - name: TraceID
+            matcherType: label
+            matcherRegex: trace_id
+            datasourceUid: tempo
+            url: "$${__value.raw}"
+            urlDisplayLabel: Ver trace
+    - name: Tempo
+      type: tempo
+      uid: tempo
+      access: proxy
+      url: http://tempo.monitoring.svc.cluster.local:3200
+      jsonData:
+        tracesToLogsV2:
+          datasourceUid: loki
+          filterByTraceId: true
+          spanStartTimeShift: -5m
+          spanEndTimeShift: 5m
+        serviceMap:
+          datasourceUid: prometheus
+        nodeGraph:
+          enabled: true
+        lokiSearch:
+          datasourceUid: loki

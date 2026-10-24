@@ -1,0 +1,75 @@
+# Ponto único de entrada OTLP da API (OTEL_EXPORTER_OTLP_ENDPOINT =
+# http://otel-collector.monitoring.svc.cluster.local:4317). Métricas vão para
+# o receiver OTLP do Prometheus (mesma tradução de nomes do otel-lgtm),
+# logs para o Loki e traces para o Tempo.
+mode: deployment
+fullnameOverride: otel-collector
+
+image:
+  repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
+
+presets:
+  # Acrescenta k8s.namespace.name, k8s.pod.name etc. aos sinais.
+  kubernetesAttributes:
+    enabled: true
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 96Mi
+  limits:
+    memory: 256Mi
+
+ports:
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+
+config:
+  processors:
+    # Só atributos de infraestrutura: service.name/namespace/instance.id
+    # continuam vindo da API, mantendo job e instance iguais aos do compose.
+    k8sattributes:
+      extract:
+        metadata:
+          - k8s.namespace.name
+          - k8s.pod.name
+          - k8s.deployment.name
+          - k8s.node.name
+        otel_annotations: false
+  receivers:
+    jaeger: null
+    zipkin: null
+    prometheus: null
+  exporters:
+    otlphttp/prometheus:
+      metrics_endpoint: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/otlp/v1/metrics
+      tls:
+        insecure: true
+    otlphttp/loki:
+      endpoint: http://loki.monitoring.svc.cluster.local:3100/otlp
+      tls:
+        insecure: true
+    otlp/tempo:
+      endpoint: tempo.monitoring.svc.cluster.local:4317
+      tls:
+        insecure: true
+  service:
+    pipelines:
+      traces:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [otlp/tempo]
+      metrics:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [otlphttp/prometheus]
+      logs:
+        receivers: [otlp]
+        processors: [memory_limiter, batch]
+        exporters: [otlphttp/loki]
