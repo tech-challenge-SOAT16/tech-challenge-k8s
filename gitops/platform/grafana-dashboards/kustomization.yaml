@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+# Mesmos JSON de docker-compose/monitoring/dashboards do repositório da
+# aplicação. O sidecar do Grafana carrega ConfigMaps com grafana_dashboard=1 na
+# pasta indicada por grafana_folder.
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: TechChallenge
+
+configMapGenerator:
+  - name: dashboard-aspnet-core
+    files:
+      - 19924-aspnet-core.json
+  - name: dashboard-aspnet-core-endpoint
+    files:
+      - 19925-aspnet-core-endpoint.json
+  - name: dashboard-techchallenge-ordens-servico
+    files:
+      - techchallenge-ordens-servico.json

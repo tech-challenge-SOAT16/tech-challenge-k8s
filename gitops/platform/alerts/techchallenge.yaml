@@ -1,0 +1,73 @@
+# Equivalente a docker-compose/monitoring/alerting/techchallenge.yaml do
+# repositório da aplicação (regras do Grafana no compose). Aqui o Prometheus
+# avalia as regras e o Alertmanager envia e-mail para o Mailpit de produção.
+# Agrupadas por namespace para separar homologação e produção.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: techchallenge
+  namespace: monitoring
+spec:
+  groups:
+    - name: techchallenge
+      interval: 30s
+      rules:
+        - alert: TechChallengeFalhasOrdensServico
+          expr: |
+            sum by (k8s_namespace_name) (
+              increase(techchallenge_processamento_falhas_total{area="ordens-servico",status_code=~"5.."}[5m])
+            ) > 0
+          for: 1m
+          labels:
+            severity: critical
+            service: techchallenge-api
+          annotations:
+            summary: "Falhas no processamento de ordens de serviço (5xx)"
+            description: "Erros internos (5xx) em rotas de ordens de serviço nos últimos 5 minutos: {{ $value | humanize }}"
+            dashboard_uid: techchallenge-os
+
+        - alert: TechChallengeFalhasNotificacoes
+          expr: |
+            sum by (k8s_namespace_name) (
+              increase(techchallenge_notificacoes_falhas_total[5m])
+            ) > 0
+          for: 1m
+          labels:
+            severity: warning
+            service: techchallenge-api
+          annotations:
+            summary: "Falhas no envio de notificações"
+            description: "Falhas no envio de e-mails da outbox nos últimos 5 minutos: {{ $value | humanize }}"
+            dashboard_uid: techchallenge-os
+
+        - alert: TechChallengeTaxaErro5xx
+          expr: |
+            (
+              sum by (k8s_namespace_name) (rate(http_server_request_duration_seconds_count{job="techchallenge-api",http_response_status_code=~"5.."}[5m]))
+              /
+              sum by (k8s_namespace_name) (rate(http_server_request_duration_seconds_count{job="techchallenge-api"}[5m]))
+            ) * 100 > 5
+          for: 1m
+          labels:
+            severity: critical
+            service: techchallenge-api
+          annotations:
+            summary: "Taxa de erro 5xx da API acima de 5%"
+            description: "Taxa de 5xx nos últimos 5 minutos: {{ $value | humanize }}%"
+            dashboard_uid: techchallenge-os
+
+        - alert: TechChallengeLatenciaP95
+          expr: |
+            histogram_quantile(0.95,
+              sum by (k8s_namespace_name, le) (
+                rate(http_server_request_duration_seconds_bucket{job="techchallenge-api",http_route!~"/health.*"}[5m])
+              )
+            ) > 1
+          for: 2m
+          labels:
+            severity: warning
+            service: techchallenge-api
+          annotations:
+            summary: "Latência p95 da API acima de 1s"
+            description: "p95 nos últimos 5 minutos: {{ $value | humanizeDuration }}"
+            dashboard_uid: techchallenge-os
