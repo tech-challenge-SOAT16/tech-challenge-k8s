@@ -1,0 +1,149 @@
+name: Terraform e GitOps
+
+# PR para develop/main: fmt, validate, tflint, terraform test, render dos
+# charts do GitOps e plan. Push em develop/main (merge do PR): apply no cluster.
+# Credenciais: chaves temporárias da sessão do AWS Academy em secrets
+# (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN), atualizadas a
+# cada sessão do Learner Lab. Bucket do state na variable TF_STATE_BUCKET.
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: 1.15.8
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  validate:
+    name: Validar Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: v0.65.0
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive -diff terraform
+
+      - name: terraform validate
+        run: |
+          for dir in terraform/cluster terraform/local terraform/modules/platform; do
+            terraform -chdir="$dir" init -backend=false
+            terraform -chdir="$dir" validate
+          done
+
+      - name: tflint
+        run: |
+          tflint --init
+          for dir in terraform/cluster terraform/local terraform/modules/platform; do
+            tflint --chdir="$dir" --config="$GITHUB_WORKSPACE/.tflint.hcl"
+          done
+
+      - name: terraform test (providers simulados)
+        run: terraform -chdir=terraform/cluster test
+
+  gitops:
+    name: Renderizar GitOps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: v4.3.1
+
+      - name: App-of-apps
+        run: |
+          helm lint gitops
+          helm template root gitops -n argocd > /dev/null
+          helm template root gitops -n argocd --set profile=kind --set apps.enabled=false > /dev/null
+
+      - name: Charts da plataforma
+        run: |
+          # Mesmos charts, versões e values das Applications em gitops/values.yaml.
+          yq '.platform | to_entries | map(select(.value.chart)) | .[] | [.key, .value.chart.repoURL, .value.chart.name, .value.chart.version, .value.namespace] | @tsv' gitops/values.yaml \
+          | while IFS=$'\t' read -r name repo chart version namespace; do
+              for profile in eks kind; do
+                args=(-f "gitops/platform/$name/values.yaml")
+                [ -f "gitops/platform/$name/values-$profile.yaml" ] && args+=(-f "gitops/platform/$name/values-$profile.yaml")
+                echo "::group::$name ($profile)"
+                helm template "$name" "$chart" --repo "$repo" --version "$version" -n "$namespace" \
+                  --api-versions monitoring.coreos.com/v1 "${args[@]}" > /dev/null
+                echo "::endgroup::"
+              done
+            done
+
+      - name: Diretórios de manifestos
+        run: |
+          kubectl kustomize gitops/platform/grafana-dashboards > /dev/null
+          for file in gitops/platform/alerts/*.yaml gitops/platform/gateway/*.yaml gitops/platform/api-routes/*.yaml gitops/platform/mailpit/*.yaml; do
+            yq -e '.' "$file" > /dev/null
+          done
+          for file in gitops/platform/grafana-dashboards/*.json; do
+            jq -e '.uid' "$file" > /dev/null
+          done
+
+  plan:
+    name: Plan
+    if: github.event_name == 'pull_request'
+    needs: [validate, gitops]
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+      AWS_REGION: us-east-1
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: terraform init
+        run: terraform -chdir=terraform/cluster init -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+
+      - name: terraform plan
+        run: terraform -chdir=terraform/cluster plan -lock=false
+
+  apply:
+    name: Apply (${{ github.ref_name }})
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: [validate, gitops]
+    runs-on: ubuntu-latest
+    # Cluster único: homologação (develop) e produção (main) aplicam o mesmo
+    # state, um de cada vez.
+    environment: ${{ github.ref_name == 'main' && 'production' || 'homolog' }}
+    concurrency:
+      group: terraform-cluster
+      cancel-in-progress: false
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+      AWS_REGION: us-east-1
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: terraform init
+        run: terraform -chdir=terraform/cluster init -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+
+      - name: terraform apply
+        run: terraform -chdir=terraform/cluster apply -auto-approve
