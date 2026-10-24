@@ -75,8 +75,9 @@ platform:
     path: gitops/platform/api-routes
     withApps: true
 
-# API: overlays Kustomize do repositório da aplicação. A pipeline da aplicação
-# grava a tag da imagem no overlay e o Argo CD sincroniza (ADR 0005).
+# API: overlays Kustomize do repositório da aplicação, um diretório por
+# ambiente na branch main. A pipeline da aplicação grava a tag da imagem no
+# overlay e o Argo CD sincroniza (ADR 0005).
 apps:
   enabled: true
   wave: 4
@@ -85,7 +86,7 @@ apps:
     techchallenge-homolog:
       namespace: techchallenge-homolog
       path: k8s/overlays/aws-eks-homolog
-      targetRevision: develop
+      targetRevision: main
     techchallenge-production:
       namespace: techchallenge
       path: k8s/overlays/aws-eks

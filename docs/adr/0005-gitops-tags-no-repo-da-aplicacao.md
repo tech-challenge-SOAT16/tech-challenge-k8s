@@ -13,17 +13,21 @@ existem no repositório da aplicação.
 ## Decisão
 
 - Os manifests e a tag da imagem ficam no repositório
-  `tech-challenge-application`: `k8s/overlays/aws-eks-homolog` (branch
-  `develop`, namespace `techchallenge-homolog`) e `k8s/overlays/aws-eks`
-  (branch `main`, namespace `techchallenge`).
+  `tech-challenge-application`, um diretório por ambiente na branch `main`:
+  `k8s/overlays/aws-eks-homolog` (namespace `techchallenge-homolog`) e
+  `k8s/overlays/aws-eks` (namespace `techchallenge`). Não há branch por
+  ambiente: o que roda em cada ambiente é sempre o que está na `main`, e
+  promover é copiar a tag de um overlay para o outro.
 - As Applications `techchallenge-homolog` e `techchallenge-production` deste
   repositório leem esses overlays. Os repositórios são públicos: não há
   credencial cross-repo.
 - A pipeline da aplicação publica a imagem no ECR, roda
   `kustomize edit set image` no overlay do ambiente e commita a tag direto na
-  mesma branch (`chore(deploy): ... [skip ci]`), sem PR. Para isso o ruleset de
-  `develop`/`main` do repositório da aplicação tem bypass somente para
-  `github-actions[bot]`, e o commit toca apenas `k8s/overlays/**`.
+  `main` (`chore(deploy): ... [skip ci]`), sem PR. A pipeline decide quando
+  cada overlay recebe a tag (por exemplo, homologação após o build e produção
+  após aprovação). Para isso o ruleset da `main` do repositório da aplicação
+  tem bypass somente para `github-actions[bot]`, e o commit toca apenas
+  `k8s/overlays/**`.
 
 ## Por que não vale para este repositório
 
@@ -39,4 +43,6 @@ repositório.
   detecta o commit da tag e faz o rollout (OutOfSync → Synced).
 - O histórico de versões implantadas fica no Git do repositório da aplicação.
 - Risco: o bypass precisa ser restrito ao ator da pipeline; nenhum humano commita
-  direto em `develop`/`main`.
+  direto na `main`.
+- Branch por ambiente foi descartada: as branches divergem com o tempo e fica
+  difícil saber qual código roda em cada ambiente.

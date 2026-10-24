@@ -96,7 +96,7 @@ Sync waves do app-of-apps:
 | 1 | `loki`, `tempo`, `otel-collector`, `grafana-dashboards`, `alerts` |
 | 2 | `kong` |
 | 3 | `gateway` (rotas do Argo CD e do Grafana, plugin prometheus), `mailpit-homolog`, `mailpit-production` |
-| 4 | `techchallenge-homolog` (`develop`), `techchallenge-production` (`main`), `api-routes` (rotas da API e rate limiting) |
+| 4 | `techchallenge-homolog`, `techchallenge-production`, `api-routes` (rotas da API e rate limiting) |
 
 ## Deploy no AWS Academy
 
@@ -203,8 +203,8 @@ Contrato com a aplicação:
   `techchallenge-homolog`, criado pelo `tech-challenge-terraform`.
 - SMTP: `Smtp__Host=mailpit`, `Smtp__Port=1025` em cada namespace.
 - OpenTelemetry: `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector.monitoring.svc.cluster.local:4317`.
-- Overlays `k8s/overlays/aws-eks-homolog` (branch `develop`) e
-  `k8s/overlays/aws-eks` (branch `main`) com a tag da imagem.
+- Overlays `k8s/overlays/aws-eks-homolog` e `k8s/overlays/aws-eks`, ambos na
+  branch `main`, com a tag da imagem de cada ambiente.
 
 ## Decisões
 
