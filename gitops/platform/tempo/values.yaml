@@ -1,0 +1,22 @@
+# Tempo single binary. Recebe traces OTLP do OpenTelemetry Collector e gera
+# métricas de service graph/span (remote write no Prometheus).
+tempo:
+  retention: 24h
+  reportingEnabled: false
+  resources:
+    requests:
+      cpu: 25m
+      memory: 128Mi
+  metricsGenerator:
+    enabled: true
+    remoteWriteUrl: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090/api/v1/write
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+persistence:
+  enabled: false
