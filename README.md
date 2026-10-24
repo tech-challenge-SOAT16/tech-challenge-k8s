@@ -231,6 +231,12 @@ Contrato com a aplicação:
 - Overlays `k8s/overlays/aws-eks-homolog` e `k8s/overlays/aws-eks`, ambos na
   branch `main`, com a tag da imagem de cada ambiente.
 
+## Demo
+
+Roteiro da demonstração (credenciais no GitHub, subida do ambiente, endereços e
+vídeo) em
+[tech-challenge-application/docs/demo/fase-3](https://github.com/tech-challenge-SOAT16/tech-challenge-application/blob/main/docs/demo/fase-3/README.md).
+
 ## Decisões
 
 - [ADR 0001 — Argo CD e GitOps](docs/adr/0001-argocd-gitops.md)
