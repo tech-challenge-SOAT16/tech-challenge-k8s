@@ -1,0 +1,63 @@
+# Instalação enxuta do Argo CD: sem Dex e sem notifications, uma réplica de
+# cada componente. A UI é publicada pelo Kong em /argocd (gitops/platform/gateway).
+dex:
+  enabled: false
+
+notifications:
+  enabled: false
+
+configs:
+  params:
+    server.insecure: true
+    server.rootpath: /argocd
+    server.basehref: /argocd
+  cm:
+    timeout.reconciliation: 60s
+    # Faz o app-of-apps respeitar as sync waves: a Application filha só fica
+    # Healthy depois de sincronizada e com os recursos dela Healthy.
+    resource.customizations.health.argoproj.io_Application: |
+      hs = {}
+      hs.status = "Progressing"
+      hs.message = "Aguardando sincronização"
+      if obj.status == nil or obj.status.health == nil or obj.status.sync == nil then
+        return hs
+      end
+      if obj.status.sync.status ~= "Synced" then
+        return hs
+      end
+      if obj.status.operationState ~= nil and obj.status.operationState.phase == "Running" then
+        return hs
+      end
+      hs.status = obj.status.health.status
+      hs.message = obj.status.health.message or ""
+      return hs
+
+controller:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+repoServer:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+server:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+
+applicationSet:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+
+redis:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
