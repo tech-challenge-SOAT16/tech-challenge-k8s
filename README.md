@@ -10,7 +10,7 @@ Repositórios da solução:
 | Repositório | Responsabilidade |
 | --- | --- |
 | `tech-challenge-k8s` (este) | VPC, EKS, ECR, security groups, Argo CD e plataforma (`gitops/`) |
-| `tech-challenge-terraform` | RDS PostgreSQL, Secrets Manager e Secret da API |
+| `tech-challenge-database` | RDS PostgreSQL, Secrets Manager e Secret da API |
 | Lambda de autenticação | Function serverless que emite o JWT |
 | `tech-challenge-application` | API .NET, imagem no ECR e overlays Kustomize com a tag da imagem |
 
@@ -229,7 +229,7 @@ Outputs de `terraform/cluster` (state `tech-challenge-k8s/cluster.tfstate`):
 Contrato com a aplicação:
 
 - Secret `techchallenge-api-secrets` em `techchallenge` e
-  `techchallenge-homolog`, criado pelo `tech-challenge-terraform`.
+  `techchallenge-homolog`, criado pelo `tech-challenge-database`.
 - SMTP: `Smtp__Host=mailpit`, `Smtp__Port=1025` em cada namespace.
 - OpenTelemetry: `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector.monitoring.svc.cluster.local:4317`.
 - Overlays `k8s/overlays/aws-eks-homolog` e `k8s/overlays/aws-eks`, ambos na
