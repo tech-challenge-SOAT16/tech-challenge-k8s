@@ -115,6 +115,10 @@ todos os repositórios) ou deste repositório. Mesmos nomes da pipeline da Lambd
 | Variable (opcional) | `TF_STATE_BUCKET` | padrão `techchallenge-tfstate-<account-id>` |
 | Variable (opcional) | `AWS_DEPLOY_ROLE_ARN` | role OIDC fora do Academy; substitui as chaves |
 
+Todas as variáveis do Terraform (tamanho do node group, NAT, versões dos
+charts, repositórios e branches lidos pelo Argo CD) estão em
+[terraform/cluster/terraform.tfvars.example](terraform/cluster/terraform.tfvars.example).
+
 O bucket do state é criado pela própria pipeline na primeira execução
 (versionado e sem acesso público). Os environments `homolog` e `production`
 são criados pelo GitHub no primeiro deploy; proteções (aprovação) são opcionais.

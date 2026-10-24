@@ -1,0 +1,36 @@
+# Exemplo de configuração de terraform/cluster. Todos os valores abaixo são os
+# padrões; altere só o que precisar.
+# Para usar localmente, copie para terraform.tfvars.
+
+region       = "us-east-1"
+project_name = "techchallenge"
+cluster_name = "techchallenge-eks"
+
+kubernetes_version = "1.35"
+vpc_cidr           = "10.0.0.0/16"
+
+# false: nós nas subnets públicas, sem custo de NAT Gateway.
+enable_nat_gateway = true
+
+# true somente fora do AWS Academy (cria as roles em vez de usar a LabRole).
+create_iam_roles = false
+lab_role_name    = "LabRole"
+
+node_instance_types = ["t3.medium"]
+node_min_size       = 2
+node_desired_size   = 2
+node_max_size       = 3
+
+ecr_repository_name = "techchallenge-application"
+namespaces          = ["techchallenge", "techchallenge-homolog", "monitoring", "kong", "argocd"]
+
+argocd_chart_version      = "10.11.1"
+argocd_apps_chart_version = "2.0.7"
+
+# Repositório e branch lidos pela Application raiz do Argo CD (gitops/).
+gitops_repo_url = "https://github.com/tech-challenge-SOAT16/tech-challenge-k8s"
+gitops_revision = "main"
+
+# Repositório e branch com os overlays da API (homologação e produção).
+app_repo_url = "https://github.com/tech-challenge-SOAT16/tech-challenge-application"
+app_revision = "main"
