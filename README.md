@@ -100,23 +100,37 @@ Sync waves do app-of-apps:
 
 ## Deploy no AWS Academy
 
-### Uma vez por conta
+### Configuração no GitHub (uma vez)
 
-1. Criar o bucket do state (o mesmo pode ser usado pelos outros repositórios):
+Em *Settings → Secrets and variables → Actions* da organização (vale para
+todos os repositórios) ou deste repositório. Mesmos nomes da pipeline da Lambda:
 
-   ```bash
-   aws s3 mb s3://techchallenge-tfstate-<account-id> --region us-east-1
-   ```
+| Tipo | Nome | Valor |
+| --- | --- | --- |
+| Secret | `AWS_ACCESS_KEY_ID` | sessão atual do Learner Lab |
+| Secret | `AWS_SECRET_ACCESS_KEY` | sessão atual do Learner Lab |
+| Secret | `AWS_SESSION_TOKEN` | sessão atual do Learner Lab |
+| Variable | `AWS_DEPLOY_ENABLED` | `true` (sem ela só roda o CI, sem plan/apply) |
+| Variable (opcional) | `AWS_REGION` | padrão `us-east-1` |
+| Variable (opcional) | `TF_STATE_BUCKET` | padrão `techchallenge-tfstate-<account-id>` |
+| Variable (opcional) | `AWS_DEPLOY_ROLE_ARN` | role OIDC fora do Academy; substitui as chaves |
 
-2. No GitHub (Settings → Secrets and variables → Actions):
-   - variable `TF_STATE_BUCKET` com o nome do bucket;
-   - environments `homolog` e `production`.
+O bucket do state é criado pela própria pipeline na primeira execução
+(versionado e sem acesso público). Os environments `homolog` e `production`
+são criados pelo GitHub no primeiro deploy; proteções (aprovação) são opcionais.
 
 ### A cada sessão do Learner Lab
 
-As chaves do Academy expiram em 4 horas. Copie os valores de *AWS Details →
-AWS CLI* para os secrets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` e
-`AWS_SESSION_TOKEN` do repositório.
+As chaves do Academy expiram em 4 horas. Em *AWS Details → AWS CLI*, copie o
+bloco para `~/.aws/credentials` e atualize os secrets (troque `--org` por
+`--repo tech-challenge-SOAT16/<repo>` se eles forem do repositório):
+
+```bash
+for key in aws_access_key_id aws_secret_access_key aws_session_token; do aws configure get "$key" | gh secret set "$(echo "$key" | tr a-z A-Z)" --org tech-challenge-SOAT16 --visibility all; done
+```
+
+Se a sessão expirar, a pipeline falha no passo "Conferir sessão e bucket do
+state" com a mensagem de credenciais expiradas.
 
 ### Pipeline (`.github/workflows/terraform.yml`)
 
@@ -125,6 +139,7 @@ AWS CLI* para os secrets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` e
 | PR para `develop` ou `main` | `terraform fmt`, `validate`, `tflint`, `terraform test`, render dos charts do `gitops/` e `terraform plan` |
 | Push em `develop` (merge do PR) | apply no cluster (environment `homolog`) |
 | Push em `main` (merge do PR) | apply no cluster (environment `production`) |
+| Manual (*Run workflow*) | `apply` ou `destroy` (desligar o cluster para poupar crédito) |
 
 O cluster é único (ADR 0002): `develop` e `main` aplicam o mesmo state, uma
 execução por vez, e a plataforma do Argo CD acompanha `main`.
@@ -134,17 +149,27 @@ Toda mudança de Terraform e de plataforma neste repositório passa por PR. A
 `github-actions[bot]` nos overlays do repositório da aplicação
 (ADR 0005); ela não vale para este repositório.
 
-### Manual
+### Acesso ao cluster
+
+Quem cria o cluster recebe acesso de administrador (access entry do EKS). No
+Academy, a pipeline e o terminal usam a mesma role (`voclabs`) da conta, então
+as mesmas credenciais da sessão funcionam nos dois:
+
+```bash
+aws eks update-kubeconfig --region us-east-1 --name techchallenge-eks
+kubectl -n argocd get applications
+```
+
+### Manual (sem pipeline)
 
 ```bash
 cd terraform/cluster
-terraform init -backend-config="bucket=techchallenge-tfstate-<account-id>"
+terraform init -backend-config="bucket=techchallenge-tfstate-$(aws sts get-caller-identity --query Account --output text)"
 terraform apply
-aws eks update-kubeconfig --region us-east-1 --name techchallenge-eks
 ```
 
-O apply leva cerca de 20 minutos. Depois o Argo CD sincroniza a plataforma
-sozinho.
+O bucket precisa existir (a pipeline cria na primeira execução). O apply leva
+cerca de 20 minutos; depois o Argo CD sincroniza a plataforma sozinho.
 
 ## Acesso
 
