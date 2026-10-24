@@ -1,0 +1,21 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.auto.tfvars
+
+# Kubeconfig gerado pelo kind (terraform/local)
+terraform/local/kubeconfig
+
+# Helm
+gitops/charts/
+gitops/Chart.lock
+
+# Módulos não fixam providers; o lock fica nas raízes (cluster e local)
+terraform/modules/**/.terraform.lock.hcl
