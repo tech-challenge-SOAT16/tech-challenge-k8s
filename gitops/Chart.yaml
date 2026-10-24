@@ -1,0 +1,5 @@
+apiVersion: v2
+name: techchallenge-gitops
+description: App-of-apps do Argo CD com a plataforma e a API do Tech Challenge.
+type: application
+version: 0.1.0
