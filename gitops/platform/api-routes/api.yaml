@@ -1,0 +1,64 @@
+# Produção: mesmas rotas do docker compose, sem reescrita de caminho.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: techchallenge-api
+  namespace: techchallenge
+  annotations:
+    konghq.com/plugins: rate-limit
+    konghq.com/strip-path: "false"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: techchallenge-api
+                port:
+                  number: 8080
+          - path: /orcamentos
+            pathType: Prefix
+            backend:
+              service:
+                name: techchallenge-api
+                port:
+                  number: 8080
+          - path: /swagger
+            pathType: Prefix
+            backend:
+              service:
+                name: techchallenge-api
+                port:
+                  number: 8080
+          - path: /openapi
+            pathType: Prefix
+            backend:
+              service:
+                name: techchallenge-api
+                port:
+                  number: 8080
+---
+# Homologação: tudo sob /homolog; o Kong remove o prefixo antes de repassar.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: techchallenge-api
+  namespace: techchallenge-homolog
+  annotations:
+    konghq.com/plugins: rate-limit
+    konghq.com/strip-path: "true"
+spec:
+  ingressClassName: kong
+  rules:
+    - http:
+        paths:
+          - path: /homolog
+            pathType: Prefix
+            backend:
+              service:
+                name: techchallenge-api
+                port:
+                  number: 8080
