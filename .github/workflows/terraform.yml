@@ -2,21 +2,35 @@ name: Terraform e GitOps
 
 # PR para develop/main: fmt, validate, tflint, terraform test, render dos
 # charts do GitOps e plan. Push em develop/main (merge do PR): apply no cluster.
-# Credenciais: chaves temporárias da sessão do AWS Academy em secrets
-# (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN), atualizadas a
-# cada sessão do Learner Lab. Bucket do state na variable TF_STATE_BUCKET.
+# Execução manual (workflow_dispatch): apply ou destroy, para economizar o
+# crédito do Learner Lab entre as sessões.
+#
+# Configuração (organização ou repositório), igual à pipeline da Lambda:
+# - secrets AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN: sessão
+#   atual do AWS Academy (AWS Details > AWS CLI), renovada a cada 4 horas;
+# - variable AWS_DEPLOY_ENABLED=true liga plan/apply (sem ela só roda o CI);
+# - opcionais: AWS_REGION (padrão us-east-1), TF_STATE_BUCKET (padrão
+#   techchallenge-tfstate-<account-id>, criado automaticamente) e
+#   AWS_DEPLOY_ROLE_ARN (OIDC fora do Academy, no lugar das chaves).
 on:
   pull_request:
     branches: [develop, main]
   push:
     branches: [develop, main]
   workflow_dispatch:
+    inputs:
+      action:
+        description: Ação no cluster
+        type: choice
+        options: [apply, destroy]
+        default: apply
 
 permissions:
   contents: read
 
 env:
   TF_VERSION: 1.15.8
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
   TF_IN_AUTOMATION: "true"
   TF_INPUT: "false"
 
@@ -98,14 +112,12 @@ jobs:
 
   plan:
     name: Plan
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && vars.AWS_DEPLOY_ENABLED == 'true'
     needs: [validate, gitops]
     runs-on: ubuntu-latest
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-      AWS_REGION: us-east-1
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
 
@@ -113,15 +125,22 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: terraform init
-        run: terraform -chdir=terraform/cluster init -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+      - uses: ./.github/actions/terraform-init
+        with:
+          working-directory: terraform/cluster
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          state-bucket: ${{ vars.TF_STATE_BUCKET }}
 
       - name: terraform plan
-        run: terraform -chdir=terraform/cluster plan -lock=false
+        run: terraform -chdir=terraform/cluster plan -lock=false -var region="$AWS_REGION"
 
   apply:
-    name: Apply (${{ github.ref_name }})
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    name: ${{ inputs.action || 'apply' }} (${{ github.ref_name }})
+    if: vars.AWS_DEPLOY_ENABLED == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: [validate, gitops]
     runs-on: ubuntu-latest
     # Cluster único: homologação (develop) e produção (main) aplicam o mesmo
@@ -130,11 +149,9 @@ jobs:
     concurrency:
       group: terraform-cluster
       cancel-in-progress: false
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
-      AWS_REGION: us-east-1
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
 
@@ -142,8 +159,29 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
-      - name: terraform init
-        run: terraform -chdir=terraform/cluster init -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+      - uses: ./.github/actions/terraform-init
+        with:
+          working-directory: terraform/cluster
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          state-bucket: ${{ vars.TF_STATE_BUCKET }}
 
-      - name: terraform apply
-        run: terraform -chdir=terraform/cluster apply -auto-approve
+      - name: terraform ${{ inputs.action || 'apply' }}
+        run: terraform -chdir=terraform/cluster "${{ inputs.action || 'apply' }}" -auto-approve -var region="$AWS_REGION"
+
+      - name: Resumo
+        if: inputs.action != 'destroy'
+        run: |
+          cluster=$(terraform -chdir=terraform/cluster output -raw cluster_name)
+          {
+            echo "### Cluster $cluster"
+            echo
+            echo '```bash'
+            terraform -chdir=terraform/cluster output -raw kubeconfig_command
+            echo
+            echo "kubectl -n argocd get applications"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
