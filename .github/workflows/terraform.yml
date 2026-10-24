@@ -139,7 +139,8 @@ jobs:
         run: terraform -chdir=terraform/cluster plan -lock=false -var region="$AWS_REGION"
 
   apply:
-    name: ${{ inputs.action || 'apply' }} (${{ github.ref_name }})
+    # Nome fixo: o GitHub não avalia expressões no nome de jobs pulados.
+    name: Apply
     if: vars.AWS_DEPLOY_ENABLED == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: [validate, gitops]
     runs-on: ubuntu-latest
