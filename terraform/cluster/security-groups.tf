@@ -1,6 +1,6 @@
 # Security groups consumidos pelos outros repositórios:
 # - lambda: anexado à Function de autenticação quando ela roda dentro da VPC;
-# - database: anexado ao RDS do tech-challenge-terraform.
+# - database: anexado ao RDS do tech-challenge-database.
 resource "aws_security_group" "lambda" {
   name        = "${var.project_name}-lambda"
   description = "Function de autenticacao dentro da VPC"
