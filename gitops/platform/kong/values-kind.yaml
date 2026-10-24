@@ -1,0 +1,14 @@
+# No kind o proxy sai por NodePort, mapeado para localhost:9080 (terraform/local).
+controller:
+  ingressController:
+    env:
+      # Sem LoadBalancer o controller não teria endereço para publicar no
+      # status dos Ingress, e o Argo CD os manteria em Progressing.
+      publish_status_address: 127.0.0.1
+
+gateway:
+  proxy:
+    type: NodePort
+    annotations: {}
+    http:
+      nodePort: 30080

@@ -1,0 +1,26 @@
+# Mesmo limite do docker compose: 60 requisições por minuto e IP.
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rate-limit
+  namespace: techchallenge
+plugin: rate-limiting
+config:
+  minute: 60
+  limit_by: ip
+  policy: local
+  error_code: 429
+  error_message: Limite de requisicoes por minuto excedido.
+---
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: rate-limit
+  namespace: techchallenge-homolog
+plugin: rate-limiting
+config:
+  minute: 60
+  limit_by: ip
+  policy: local
+  error_code: 429
+  error_message: Limite de requisicoes por minuto excedido.

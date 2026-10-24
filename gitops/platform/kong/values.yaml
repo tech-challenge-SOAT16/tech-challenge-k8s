@@ -1,0 +1,27 @@
+# Kong Ingress Controller + Kong Gateway 3.9 OSS em modo DB-less. O proxy é
+# publicado por um Network Load Balancer; as rotas ficam em gitops/platform/gateway.
+controller:
+  ingressController:
+    ingressClass: kong
+  resources:
+    requests:
+      cpu: 25m
+      memory: 96Mi
+
+gateway:
+  image:
+    repository: kong
+    tag: "3.9"
+  proxy:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    tls:
+      enabled: false
+  serviceMonitor:
+    enabled: true
+    trustCRDsExist: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
