@@ -148,10 +148,9 @@ state" com a mensagem de credenciais expiradas.
 O cluster é único (ADR 0002): `develop` e `main` aplicam o mesmo state, uma
 execução por vez, e a plataforma do Argo CD acompanha `main`.
 
-Toda mudança de Terraform e de plataforma neste repositório passa por PR. A
-única exceção a PR na solução é o commit da tag de imagem feito por
-`github-actions[bot]` nos overlays do repositório da aplicação
-(ADR 0005); ela não vale para este repositório.
+Toda mudança de Terraform e de plataforma neste repositório passa por PR. No
+repositório da aplicação, a tag da imagem também entra por PR, aberto pela
+pipeline a partir da branch `deploy/<overlay>-<run>` (ADR 0005).
 
 ### Acesso ao cluster
 
