@@ -21,13 +21,11 @@ existem no repositório da aplicação.
 - As Applications `techchallenge-homolog` e `techchallenge-production` deste
   repositório leem esses overlays. Os repositórios são públicos: não há
   credencial cross-repo.
-- A pipeline da aplicação publica a imagem no ECR, roda
-  `kustomize edit set image` no overlay do ambiente e commita a tag direto na
-  `main` (`chore(deploy): ... [skip ci]`), sem PR. A pipeline decide quando
-  cada overlay recebe a tag (por exemplo, homologação após o build e produção
-  após aprovação). Para isso o ruleset da `main` do repositório da aplicação
-  tem bypass somente para `github-actions[bot]`, e o commit toca apenas
-  `k8s/overlays/**`.
+- A pipeline da aplicação publica a imagem no ECR, grava a nova tag no
+  `kustomization.yaml` do overlay do ambiente e abre a branch
+  `deploy/<overlay>-<run>`. A tag entra na `main` por Pull Request revisado,
+  com os mesmos checks de qualquer mudança; o commit toca apenas
+  `k8s/overlays/**`. O ruleset da `main` não tem bypass para a pipeline.
 
 ## Por que não vale para este repositório
 
@@ -42,7 +40,8 @@ repositório.
 - Deploy da API sem credencial do cluster na pipeline da aplicação; o Argo CD
   detecta o commit da tag e faz o rollout (OutOfSync → Synced).
 - O histórico de versões implantadas fica no Git do repositório da aplicação.
-- Risco: o bypass precisa ser restrito ao ator da pipeline; nenhum humano commita
-  direto na `main`.
+- O PR de deploy exige um revisor, o que adiciona um passo manual entre o
+  build e o rollout; em troca, ninguém (humano ou bot) commita direto na `main`
+  e o deploy fica registrado como PR no histórico.
 - Branch por ambiente foi descartada: as branches divergem com o tempo e fica
   difícil saber qual código roda em cada ambiente.
