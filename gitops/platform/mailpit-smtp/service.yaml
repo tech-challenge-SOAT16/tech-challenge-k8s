@@ -1,0 +1,16 @@
+# Private SMTP endpoint for the VPC Lambda. The inbox remains ClusterIP-only.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailpit-smtp
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: mailpit
+  ports:
+    - name: smtp
+      port: 1025
+      targetPort: smtp

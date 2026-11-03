@@ -67,6 +67,18 @@ platform:
     wave: 3
     namespace: techchallenge
     path: gitops/platform/mailpit
+  mailpit-smtp-homolog:
+    wave: 3
+    namespace: techchallenge-homolog
+    path: gitops/platform/mailpit-smtp
+    withApps: true
+    eksOnly: true
+  mailpit-smtp-production:
+    wave: 3
+    namespace: techchallenge
+    path: gitops/platform/mailpit-smtp
+    withApps: true
+    eksOnly: true
   # Rotas da API: na mesma wave da API, porque o Ingress só fica Healthy
   # depois que o Service da API existe.
   api-routes:

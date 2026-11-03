@@ -1,5 +1,5 @@
 {{- range $name, $c := .Values.platform }}
-{{- if or (not $c.withApps) $.Values.apps.enabled }}
+{{- if and (or (not $c.withApps) $.Values.apps.enabled) (or (not $c.eksOnly) (eq $.Values.profile "eks")) }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
